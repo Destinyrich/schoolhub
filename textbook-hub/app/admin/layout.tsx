@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import Providers from "@/components/Providers";
 import AdminSidebar from "@/components/AdminSidebar";
 import { getServerSession } from "next-auth";
