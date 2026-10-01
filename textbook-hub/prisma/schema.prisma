@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // SQLite is fine for a low-budget launch. For real traffic, switch to:
+  // provider = "postgresql"  and DATABASE_URL = your Postgres connection string
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+// Simple global key-value store for site-wide settings the admin can change
+// at will: default fee, currency, AdSense IDs, site name, etc.
+model Setting {
+  key   String @id
+  value String
+}
+
+model ClassLevel {
+  id       String    @id @default(cuid())
+  name     String    @unique // e.g. "JSS1", "SS3"
+  section  String // "Primary" | "Junior Secondary" | "Senior Secondary"
+  order    Int       @default(0)
+  subjects Subject[]
+  books    Book[]
+}
+
+model Subject {
+  id           String     @id @default(cuid())
+  name         String // e.g. "Mathematics"
+  classLevelId String
+  classLevel   ClassLevel @relation(fields: [classLevelId], references: [id], onDelete: Cascade)
+  books        Book[]
+
+  @@unique([name, classLevelId])
+}
+
+model Book {
+  id           String     @id @default(cuid())
+  title        String
+  description  String?
+  coverImage   String? // path under /uploads
+  classLevelId String
+  classLevel   ClassLevel @relation(fields: [classLevelId], references: [id])
+  subjectId    String
+  subject      Subject    @relation(fields: [subjectId], references: [id])
+
+  // Pricing: if isFree = true, the whole book is free.
+  // If priceOverride is set, it's used instead of the global default fee.
+  isFree        Boolean  @default(false)
+  priceOverride Int? // in kobo (NGN smallest unit), null = use global default fee
+  published     Boolean  @default(false)
+
+  chapters  Chapter[]
+  purchases Purchase[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Chapter {
+  id     String @id @default(cuid())
+  bookId String
+  book   Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  title  String
+  order  Int    @default(0)
+
+  // Either write content directly (text/HTML) or attach a file (PDF etc.)
+  contentType String @default("text") // "text" | "file"
+  contentHtml String? // rich text content
+  fileUrl     String? // path under /uploads for PDF chapters
+
+  // Free preview chapters are viewable without payment even on a paid book
+  isFreePreview Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id])
+  email     String
+  amount    Int // kobo, amount actually paid
+  reference String   @unique // Paystack transaction reference
+  status    String   @default("pending") // pending | success | failed
+  createdAt DateTime @default(now())
+}
